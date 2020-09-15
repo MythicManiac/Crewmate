@@ -4,9 +4,8 @@ from scapy.fields import (
     ConditionalField,
     PacketField,
     IntField,
-    ByteField,
-    FieldLenField,
     StrLenField,
+    MSBExtendedField
 )
 from scapy.packet import Packet
 
@@ -28,6 +27,29 @@ class PacketFieldEnum:
                 )
             )
         }
+
+
+class MSBExtendedFieldLenField(MSBExtendedField):
+    __slots__ = ["length_of", "count_of", "adjust"]
+
+    def __init__(self, name, default, length_of=None, count_of=None, adjust=lambda pkt, x: x, fld=None):
+        MSBExtendedField.__init__(self, name, default)
+        self.length_of = length_of
+        self.count_of = count_of
+        self.adjust = adjust
+        if fld is not None:
+            self.length_of = fld
+
+    def i2m(self, pkt, x):
+        if x is None:
+            if self.length_of is not None:
+                fld, fval = pkt.getfield_and_val(self.length_of)
+                f = fld.i2len(pkt, fval)
+            else:
+                fld, fval = pkt.getfield_and_val(self.count_of)
+                f = fld.i2count(pkt, fval)
+            x = self.adjust(pkt, f)
+        return x
 
 
 class HazelMarker(PacketFieldEnum):
@@ -113,8 +135,7 @@ class GameDataType(PacketFieldEnum):
 class ChatRPC(Packet):
     name = "ChatRPC"
     fields_desc = [
-        # TODO: Use compressed int for len
-        FieldLenField("rpcChatLen", None, "rpcChatMessage", fmt="B"),
+        MSBExtendedFieldLenField("rpcChatLen", None, "rpcChatMessage"),
         StrLenField(
             "rpcChatMessage",
             None,
@@ -126,7 +147,7 @@ class ChatRPC(Packet):
 class RPC(Packet):
     name = "RPC"
     fields_desc = [
-        ByteField("rpcTargetId", None),
+        MSBExtendedField("rpcTargetId", None),
         ByteEnumField("rpcAction", None, RPCAction.as_dict()),
         ConditionalField(
             PacketField("ChatRPC", None, ChatRPC),

@@ -1,5 +1,6 @@
 import psutil
 from scapy.layers.inet import IP, UDP
+from scapy.packet import Padding
 from scapy.sendrecv import sniff
 from scapy.utils import hexdump
 
@@ -25,12 +26,7 @@ class Capturer:
         print(f"Using connection port {connection.laddr.port}")
 
         def callback(packet):
-            if len(packet) > 20:
-                return hexdump(packet)
-            return packet.layers()
-            res = dissector.dissect_packet(packet)
-            if res:
-                return packet.sprintf(res)
+            return dissector.dissect_packet(packet)
 
         register_layers()
         sniff(prn=callback, filter=f"udp and port {connection.laddr.port}")
