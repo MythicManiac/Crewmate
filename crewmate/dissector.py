@@ -1,3 +1,5 @@
+import requests
+
 from scapy.packet import bind_layers
 from scapy.utils import RawPcapReader
 from scapy.layers.l2 import Ether
@@ -6,6 +8,14 @@ from scapy.layers.inet import IP, UDP
 from crewmate.packets import Hazel, GameData, RPC, ChatRPC, HazelTag, GameDataType, RPCAction
 
 LAYERS_BOUND = False
+
+
+def unmute_discord():
+    requests.get("unmute url")
+
+
+def mute_discord():
+    requests.get("mute url")
 
 
 def register_layers():
@@ -36,32 +46,28 @@ class Dissector:
         hazel_pkt = udp_pkt[Hazel]
 
         if hazel_pkt.hazelTag != HazelTag.GAME_DATA:
+            if hazel_pkt.hazelTag == HazelTag.START_GAME:
+                mute_discord()
+            if hazel_pkt.hazelTag == HazelTag.END_GAME:
+                unmute_discord()
             return
-
-        # print("### Hazel ###")
-        # print(f"Marker: {hazel_pkt.hazelMarker}")
-        # print(f"Size: {hazel_pkt.hazelPacketSize}")
-        # print(f"Tag: {hazel_pkt.hazelTag}")
 
         game_data_pkt = hazel_pkt[GameData]
         if game_data_pkt.gameDataType != GameDataType.RPC:
             return
 
-        # print("### GameData ###")
-        # print(f"gameDataCode: {game_data_pkt.gameDataCode}")
-        # print(f"gameDataLength: {game_data_pkt.gameDataLength}")
-        # print(f"gameDataType: {game_data_pkt.gameDataType}")
-
         rpc_pkt = game_data_pkt[RPC]
-
-        # print("### RPC ###")
-        # print(f"rpcTargetId: {rpc_pkt.rpcTargetId}")
-        # print(f"rpcAction: {rpc_pkt.rpcAction}")
 
         action = rpc_pkt.rpcAction
         action_name = RPCAction.as_dict().get(action, "UNKNOWN")
         if action != RPCAction.SENDCHAT:
-            return f"{action_name}"
+
+            if action == RPCAction.STARTMEETING:
+                unmute_discord()
+            if action == RPCAction.CLOSE:
+                mute_discord()
+
+            return rpc_pkt.show()
 
         rpc_chat = rpc_pkt[ChatRPC]
         message = rpc_chat.rpcChatMessage.decode("utf-8")
@@ -81,11 +87,8 @@ class PcapDissector(Dissector):
         count = 0
         for (packet, meta,) in RawPcapReader(self.filepath):
             count += 1
-            # if count != 2430:
-            #     continue
             res = self.dissect_packet(Ether(packet))
             if res:
                 print(res)
-            # break
 
         print(f"{self.filepath} has {count} packets")

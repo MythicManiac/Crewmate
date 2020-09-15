@@ -5,8 +5,8 @@ from scapy.fields import (
     PacketField,
     IntField,
     StrLenField,
-    MSBExtendedField
-)
+    MSBExtendedField,
+    ByteField)
 from scapy.packet import Packet
 
 
@@ -68,6 +68,10 @@ class HazelMarker(PacketFieldEnum):
     @classmethod
     def get_unreliable(cls):
         return {cls.NONE, cls.DISCONNECT, cls.ACK, cls.FRAGMENT}
+
+
+class ChatNoteTypes(PacketFieldEnum):
+    DIDVOTE = 0
 
 
 class RPCAction(PacketFieldEnum):
@@ -144,6 +148,37 @@ class ChatRPC(Packet):
     ]
 
 
+class StartMeetingRPC(Packet):
+    name = "StartMeetingRPC"
+    fields_desc = [
+        ByteField("playerId", None),
+    ]
+
+
+class ReportDeadBodyRPC(Packet):
+    name = "ReportDeadBodyRPC"
+    fields_desc = [
+        ByteField("playerId", None),
+    ]
+
+
+class SendChatNoteRPC(Packet):
+    name = "SendChatNoteRPC"
+    fields_desc = [
+        ByteField("playerId", None),
+        ByteEnumField("chatNoteType", None, ChatNoteTypes.as_dict()),
+    ]
+
+
+class VotingCompleteRPC(Packet):
+    name = "VotingCompleteRPC"
+    fields_desc = [
+        # # Byte array of states
+        # ByteField("playerId", None),  # 0xFF if nobody
+        # ByteField("votingTie", None),
+    ]
+
+
 class RPC(Packet):
     name = "RPC"
     fields_desc = [
@@ -152,6 +187,22 @@ class RPC(Packet):
         ConditionalField(
             PacketField("ChatRPC", None, ChatRPC),
             lambda packet: packet.rpcAction == RPCAction.SENDCHAT,
+        ),
+        ConditionalField(
+            PacketField("StartMeetingRPC", None, StartMeetingRPC),
+            lambda packet: packet.rpcAction == RPCAction.STARTMEETING,
+        ),
+        ConditionalField(
+            PacketField("VotingCompleteRPC", None, VotingCompleteRPC),
+            lambda packet: packet.rpcAction == RPCAction.VOTINGCOMPLETE,
+        ),
+        ConditionalField(
+            PacketField("SendChatNoteRPC", None, SendChatNoteRPC),
+            lambda packet: packet.rpcAction == RPCAction.SENDCHATNOTE,
+        ),
+        ConditionalField(
+            PacketField("ReportDeadBodyRPC", None, ReportDeadBodyRPC),
+            lambda packet: packet.rpcAction == RPCAction.REPORTDEADBODY,
         ),
     ]
 
