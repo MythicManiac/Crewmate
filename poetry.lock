@@ -1,0 +1,22 @@
+[[package]]
+category = "main"
+description = "Scapy: interactive packet manipulation tool"
+name = "scapy"
+optional = false
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, <4"
+version = "2.4.4"
+
+[package.extras]
+basic = ["ipython"]
+complete = ["ipython", "pyx", "cryptography (>=2.0)", "matplotlib"]
+docs = ["sphinx (>=2.2.0)", "sphinx_rtd_theme (>=0.4.3)", "tox (>=3.0.0)"]
+
+[metadata]
+content-hash = "1b7a92bba40f5a13330dec0333f71d889ec8a2ed685607e639c0a17e0d309ab9"
+lock-version = "1.0"
+python-versions = "^3.8"
+
+[metadata.files]
+scapy = [
+    {file = "scapy-2.4.4.tar.gz", hash = "sha256:ecfd7a14cd9c3ef0eb08d28d5bb71d97219edff1454ccbdff229f676b27900ee"},
+]
