@@ -1,7 +1,8 @@
 import argparse
 import os
 
-from crewmate.dissector import Dissector
+from crewmate.capture import Capturer
+from crewmate.dissector import PcapDissector
 
 
 def parse_arguments():
@@ -10,6 +11,11 @@ def parse_arguments():
         "--dissect",
         metavar="<pcap filename>",
         help="path to .pcapng file to dissect"
+    )
+    parser.add_argument(
+        "--capture",
+        metavar="<pid>",
+        help="pid of an among us instance"
     )
     return vars(parser.parse_args())
 
@@ -20,13 +26,22 @@ def validate_arguments(args):
     if dissect:
         if not os.path.exists(dissect):
             errors.append(f"File not found: {dissect}")
+    capture = args.get("capture", False)
+    if capture:
+        try:
+            args["capture"] = int(capture)
+        except ValueError:
+            errors.append(f"Invalid capture PID: {capture}")
     return errors
 
 
 def execute(args):
-    if "dissect" in args:
-        dissector = Dissector(args["dissect"])
+    if args.get("dissect"):
+        dissector = PcapDissector(args["dissect"])
         dissector.process_pcap()
+    if args.get("capture"):
+        capturer = Capturer(args["capture"])
+        capturer.capture()
 
 
 def execute_from_commandline():

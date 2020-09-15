@@ -5,65 +5,90 @@ from scapy.layers.inet import IP, UDP
 
 from crewmate.packets import Hazel, GameData, RPC, ChatRPC, HazelTag, GameDataType, RPCAction
 
+LAYERS_BOUND = False
+
+
+def register_layers():
+    global LAYERS_BOUND
+    if not LAYERS_BOUND:
+        bind_layers(UDP, Hazel)
+        bind_layers(Hazel, GameData)
+        bind_layers(GameData, RPC)
+        bind_layers(RPC, ChatRPC)
+        LAYERS_BOUND = True
+
 
 class Dissector:
 
+    def dissect_packet(self, packet):
+        register_layers()
+        ether_pkt = Ether(packet)
+        if "type" not in ether_pkt.fields:
+            return
+
+        if ether_pkt.type != 0x0800:
+            return
+
+        ip_pkt = ether_pkt[IP]
+        if ip_pkt.proto != 17:
+            return
+
+        # # TODO: Remove
+        # if ip_pkt.dst != "45.79.251.16":
+        #     continue
+
+        udp_pkt = ip_pkt[UDP]
+        hazel_pkt = udp_pkt[Hazel]
+
+        if hazel_pkt.hazelTag != HazelTag.GAME_DATA:
+            return
+
+        print("### Hazel ###")
+        print(f"Marker: {hazel_pkt.hazelMarker}")
+        print(f"Size: {hazel_pkt.hazelPacketSize}")
+        print(f"Tag: {hazel_pkt.hazelTag}")
+
+        game_data_pkt = hazel_pkt[GameData]
+        if game_data_pkt.gameDataType != GameDataType.RPC:
+            return
+
+        print("### GameData ###")
+        print(f"gameDataCode: {game_data_pkt.gameDataCode}")
+        print(f"gameDataLength: {game_data_pkt.gameDataLength}")
+        print(f"gameDataType: {game_data_pkt.gameDataType}")
+
+        rpc_pkt = game_data_pkt[RPC]
+
+        print("### RPC ###")
+        print(f"rpcTargetId: {rpc_pkt.rpcTargetId}")
+        print(f"rpcAction: {rpc_pkt.rpcAction}")
+
+        if rpc_pkt.rpcAction != RPCAction.SENDCHAT:
+            return
+
+        print("lol")
+
+        rpc_chat = rpc_pkt[ChatRPC]
+        return rpc_chat.rpcChatMessage.decode("utf-8")
+
+
+class PcapDissector(Dissector):
+
     def __init__(self, filepath):
         self.filepath = filepath
+        super().__init__()
 
     def process_pcap(self):
         print(f"Reading {self.filepath}")
 
         count = 0
-        interesting_packet_count = 0
-
-        bind_layers(UDP, Hazel)
-        bind_layers(Hazel, GameData)
-        bind_layers(GameData, RPC)
-        bind_layers(RPC, ChatRPC)
-
-        for (pkt_data, pkt_metadata,) in RawPcapReader(self.filepath):
+        for (packet, meta,) in RawPcapReader(self.filepath):
             count += 1
-
-            ether_pkt = Ether(pkt_data)
-            if "type" not in ether_pkt.fields:
+            if count != 2430:
                 continue
+            res = self.dissect_packet(packet)
+            if res:
+                print(res)
+            break
 
-            if ether_pkt.type != 0x0800:
-                continue
-
-            ip_pkt = ether_pkt[IP]
-            if ip_pkt.proto != 17:
-                continue
-
-            # # TODO: Remove
-            # if ip_pkt.dst != "45.79.251.16":
-            #     continue
-
-            # if count != 5725:
-            #     continue
-
-            udp_pkt = ip_pkt[UDP]
-            hazel_pkt = udp_pkt[Hazel]
-
-            # print(hazel_pkt.hazelMarker)
-            # print(hazel_pkt.show())
-            # break
-
-            if hazel_pkt.hazelTag != HazelTag.GAME_DATA:
-                continue
-            interesting_packet_count += 1
-
-            game_data_pkt = hazel_pkt[GameData]
-            if game_data_pkt.gameDataType != GameDataType.RPC:
-                continue
-
-            rpc_pkt = game_data_pkt[RPC]
-            if rpc_pkt.rpcAction != RPCAction.SENDCHAT:
-                continue
-
-            rpc_chat = rpc_pkt[ChatRPC]
-            print(rpc_chat.rpcChatMessage.decode("utf-8"))
-
-        # print(f"{self.filepath} has {count} packets")
-        # print(f"{self.filepath} has {interesting_packet_count} interesting packets")
+        print(f"{self.filepath} has {count} packets")

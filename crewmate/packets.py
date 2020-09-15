@@ -140,7 +140,7 @@ class GameData(Packet):
     fields_desc = [
         IntField("gameDataCode", None),
         ShortField("gameDataLength", None),
-        ByteEnumField("gameDataType", None, PacketFieldEnum.as_dict()),
+        ByteEnumField("gameDataType", None, GameDataType.as_dict()),
         ConditionalField(
             PacketField("RPC", None, RPC),
             lambda packet: packet.gameDataType == GameDataType.RPC,
