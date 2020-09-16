@@ -6,7 +6,9 @@ from scapy.fields import (
     IntField,
     StrLenField,
     MSBExtendedField,
-    ByteField)
+    ByteField,
+    PacketListField,
+    LEShortField)
 from scapy.packet import Packet
 
 
@@ -52,8 +54,8 @@ class MSBExtendedFieldLenField(MSBExtendedField):
         return x
 
 
-class HazelMarker(PacketFieldEnum):
-    NONE = 0
+class HazelType(PacketFieldEnum):
+    UNRELIABLE = 0
     RELIABLE = 1
     HELLO = 8
     DISCONNECT = 9
@@ -67,7 +69,7 @@ class HazelMarker(PacketFieldEnum):
 
     @classmethod
     def get_unreliable(cls):
-        return {cls.NONE, cls.DISCONNECT, cls.ACK, cls.FRAGMENT}
+        return {cls.UNRELIABLE, cls.DISCONNECT, cls.ACK, cls.FRAGMENT}
 
 
 class ChatNoteTypes(PacketFieldEnum):
@@ -105,7 +107,7 @@ class RPCAction(PacketFieldEnum):
     CLOSEDOORSOFTYPE = 27
     REPAIRSYSTEM = 28
     SETTASKS = 29
-    UPDATEGAMEDAT = 30
+    UPDATEGAMEDATA = 30
 
 
 class HazelTag(PacketFieldEnum):
@@ -147,12 +149,18 @@ class ChatRPC(Packet):
         ),
     ]
 
+    def extract_padding(self, p):
+        return "", p
+
 
 class StartMeetingRPC(Packet):
     name = "StartMeetingRPC"
     fields_desc = [
         ByteField("playerId", None),
     ]
+
+    def extract_padding(self, p):
+        return "", p
 
 
 class ReportDeadBodyRPC(Packet):
@@ -161,6 +169,9 @@ class ReportDeadBodyRPC(Packet):
         ByteField("playerId", None),
     ]
 
+    def extract_padding(self, p):
+        return "", p
+
 
 class SendChatNoteRPC(Packet):
     name = "SendChatNoteRPC"
@@ -168,6 +179,9 @@ class SendChatNoteRPC(Packet):
         ByteField("playerId", None),
         ByteEnumField("chatNoteType", None, ChatNoteTypes.as_dict()),
     ]
+
+    def extract_padding(self, p):
+        return "", p
 
 
 class VotingCompleteRPC(Packet):
@@ -178,6 +192,75 @@ class VotingCompleteRPC(Packet):
         # ByteField("votingTie", None),
     ]
 
+    def extract_padding(self, p):
+        return "", p
+
+
+class TaskData(Packet):
+    name = "TaskData"
+    fields_desc = [
+        MSBExtendedField("taskId", None),
+        ByteField("complete", None),
+    ]
+
+    def extract_padding(self, p):
+        return "", p
+
+
+class PlayerData(Packet):
+    name = "PlayerData"
+    fields_desc = [
+        ShortField("updateGameDataLen", None),
+        ByteField("playerId", None),
+        MSBExtendedFieldLenField("playerNameLen", None, "playerName"),
+        StrLenField(
+            "playerName", None,
+            length_from=lambda packet: packet.playerNameLen
+        ),
+        ByteField("colorId", None),
+        MSBExtendedField("hatId", None),
+        MSBExtendedField("petId", None),
+        MSBExtendedField("skinId", None),
+        ByteField("statusBitField", None),  # TODO: Convert to BitField
+        ByteField("taskCount", None),
+        PacketListField(
+            "tasks", [], cls=TaskData,
+            count_from=lambda packet: packet.taskCount,
+        ),
+    ]
+
+    def extract_padding(self, p):
+        return "", p
+
+
+class UpdateGameDataRPC(Packet):
+    name = "UpdateGameDataRPC"
+    fields_desc = [
+        PacketListField("players", [], cls=PlayerData)
+    ]
+
+    def extract_padding(self, p):
+        return "", p
+
+
+class SetStartCounterRPC(Packet):
+    name = "SetStartCounterRPC"
+    fields_desc = [
+    ]
+
+    def extract_padding(self, p):
+        return "", p
+
+
+class SetHatRPC(Packet):
+    name = "SetHatRPC"
+    fields_desc = [
+        MSBExtendedField("hatId", None),
+    ]
+
+    def extract_padding(self, p):
+        return "", p
+
 
 class RPC(Packet):
     name = "RPC"
@@ -187,6 +270,14 @@ class RPC(Packet):
         ConditionalField(
             PacketField("ChatRPC", None, ChatRPC),
             lambda packet: packet.rpcAction == RPCAction.SENDCHAT,
+        ),
+        ConditionalField(
+            PacketField("SetStartCounterRPC", None, SetStartCounterRPC),
+            lambda packet: packet.rpcAction == RPCAction.SETSTARTCOUNTER,
+        ),
+        ConditionalField(
+            PacketField("SetHatRPC", None, SetHatRPC),
+            lambda packet: packet.rpcAction == RPCAction.SETHAT,
         ),
         ConditionalField(
             PacketField("StartMeetingRPC", None, StartMeetingRPC),
@@ -204,51 +295,70 @@ class RPC(Packet):
             PacketField("ReportDeadBodyRPC", None, ReportDeadBodyRPC),
             lambda packet: packet.rpcAction == RPCAction.REPORTDEADBODY,
         ),
+        ConditionalField(
+            PacketField("UpdateGameDataRPC", None, UpdateGameDataRPC),
+            lambda packet: packet.rpcAction == RPCAction.UPDATEGAMEDATA,
+        )
     ]
+
+    def extract_padding(self, p):
+        return "", p
+
+
+class GameDataData(Packet):
+    name = "GameDataData"
+    fields_desc = [
+    ]
+
+    def extract_padding(self, p):
+        return "", p
 
 
 class GameData(Packet):
     name = "GameData"
     fields_desc = [
-        IntField("gameDataCode", None),
-        ShortField("gameDataLength", None),
-        ByteEnumField("gameDataType", None, GameDataType.as_dict()),
+        LEShortField("contentSize", None),
+        ByteEnumField("type", None, GameDataType.as_dict()),
         ConditionalField(
             PacketField("RPC", None, RPC),
-            lambda packet: packet.gameDataType == GameDataType.RPC,
+            lambda packet: packet.type == GameDataType.RPC,
+        ),
+        ConditionalField(
+            PacketField("data", None, GameDataData),
+            lambda packet: packet.type == GameDataType.DATA,
         ),
     ]
+
+    def extract_padding(self, p):
+        return "", p
+
+
+class GameDataEnvelope(Packet):
+    name = "GameDataEnvelope"
+    fields_desc = [
+        IntField("roomCode", None),
+        PacketListField("messages", [], cls=GameData, count_from=lambda x: 1),
+    ]
+
+    def extract_padding(self, p):
+        return "", p
 
 
 class Hazel(Packet):
     name = "Hazel"
     fields_desc = [
-        ByteEnumField("hazelMarker", None, HazelMarker.as_dict()),
+        ByteEnumField("type", None, HazelType.as_dict()),
         ConditionalField(
             ShortField("hazelPacketId", None),
-            lambda packet: packet.hazelMarker in HazelMarker.get_reliable()
+            lambda packet: packet.type in HazelType.get_reliable()
         ),
-        ShortField("hazelPacketSize", None),
+        LEShortField("hazelContentSize", None),
         ByteEnumField("hazelTag", None, HazelTag.as_dict()),
         ConditionalField(
-            PacketField("GameData", None, GameData),
+            PacketField("GameDataEnvelope", None, GameDataEnvelope),
             lambda packet: packet.hazelTag == HazelTag.GAME_DATA
         ),
     ]
 
-
-# class MainPacket(Packet):
-#     fields_desc = [
-#         IntEnumField("record_type", 1, {
-#             3:"DATA_LONG",
-#             8:"DATA_SZ"}),
-#         FieldLenField("record_nb", 0, fmt="I", count_of="records"),
-#         ConditionalField(
-#             PacketListField(
-#                 "records", None, RecordLONG, count_from=lambda pkt:pkt.record_nb),
-#             lambda pkt: pkt.record_type == 3),
-#         ConditionalField(
-#             PacketListField(
-#                 "records", None, RecordSZ, count_from=lambda pkt:pkt.record_nb),
-#             lambda pkt: pkt.record_type == 8),
-#     ]
+    def extract_padding(self, p):
+        return "", p

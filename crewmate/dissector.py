@@ -1,11 +1,11 @@
 import requests
 
-from scapy.packet import bind_layers
-from scapy.utils import RawPcapReader
+from scapy.packet import bind_layers, Padding
+from scapy.utils import RawPcapReader, hexdump
 from scapy.layers.l2 import Ether
-from scapy.layers.inet import IP, UDP
+from scapy.layers.inet import UDP
 
-from crewmate.packets import Hazel, GameData, RPC, ChatRPC, HazelTag, GameDataType, RPCAction
+from crewmate.packets import Hazel, GameDataEnvelope, RPC, ChatRPC, HazelTag, RPCAction
 
 LAYERS_BOUND = False
 
@@ -22,56 +22,45 @@ def register_layers():
     global LAYERS_BOUND
     if not LAYERS_BOUND:
         bind_layers(UDP, Hazel)
-        bind_layers(Hazel, GameData)
-        bind_layers(GameData, RPC)
+        bind_layers(Hazel, GameDataEnvelope)
+        bind_layers(GameDataEnvelope, RPC)
         bind_layers(RPC, ChatRPC)
         LAYERS_BOUND = True
 
 
 class Dissector:
 
-    def dissect_packet(self, packet):
+    def __init__(self):
         register_layers()
-        if "type" not in packet.fields:
+
+    def dissect_packet(self, packet):
+        if UDP not in packet:
             return
-
-        if packet.type != 0x0800:
+        udp = packet[UDP]
+        if RPC not in packet:
             return
+        udp.show()
+        if Padding in udp:
+            hexdump(udp[Padding])
 
-        ip_pkt = packet[IP]
-        if ip_pkt.proto != 17:
-            return
 
-        udp_pkt = ip_pkt[UDP]
-        hazel_pkt = udp_pkt[Hazel]
+class DiscordMuteDissector(Dissector):
 
-        if hazel_pkt.hazelTag != HazelTag.GAME_DATA:
-            if hazel_pkt.hazelTag == HazelTag.START_GAME:
+    def dissect_packet(self, packet):
+        # result = super().dissect_packet(packet)
+        if Hazel in packet:
+            hazel = packet[Hazel]
+            if hazel.hazelTag == HazelTag.START_GAME:
                 mute_discord()
-            if hazel_pkt.hazelTag == HazelTag.END_GAME:
+            if hazel.hazelTag == HazelTag.END_GAME:
                 unmute_discord()
-            return
-
-        game_data_pkt = hazel_pkt[GameData]
-        if game_data_pkt.gameDataType != GameDataType.RPC:
-            return
-
-        rpc_pkt = game_data_pkt[RPC]
-
-        action = rpc_pkt.rpcAction
-        action_name = RPCAction.as_dict().get(action, "UNKNOWN")
-        if action != RPCAction.SENDCHAT:
-
-            if action == RPCAction.STARTMEETING:
+        if RPC in packet:
+            rpc = packet[RPC]
+            if rpc.rpcAction == RPCAction.STARTMEETING:
                 unmute_discord()
-            if action == RPCAction.CLOSE:
+            if rpc.rpcAction == RPCAction.CLOSE:
                 mute_discord()
-
-            return rpc_pkt.show()
-
-        rpc_chat = rpc_pkt[ChatRPC]
-        message = rpc_chat.rpcChatMessage.decode("utf-8")
-        return f"{action_name}: {message}"
+        # return result
 
 
 class PcapDissector(Dissector):

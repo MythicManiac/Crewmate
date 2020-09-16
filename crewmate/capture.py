@@ -1,11 +1,7 @@
 import psutil
-from scapy.layers.inet import IP, UDP
-from scapy.packet import Padding
 from scapy.sendrecv import sniff
-from scapy.utils import hexdump
 
-from crewmate.dissector import register_layers, Dissector
-from crewmate.packets import ChatRPC, Hazel, HazelTag, GameData, RPC, RPCAction, GameDataType
+from crewmate.dissector import DiscordMuteDissector
 
 
 class Capturer:
@@ -22,11 +18,10 @@ class Capturer:
             return
         print(f"Found {len(connections)} connections, picking first")
         connection = connections[0]
-        dissector = Dissector()
+        dissector = DiscordMuteDissector()
         print(f"Using connection port {connection.laddr.port}")
 
         def callback(packet):
             return dissector.dissect_packet(packet)
 
-        register_layers()
         sniff(prn=callback, filter=f"udp and port {connection.laddr.port}")

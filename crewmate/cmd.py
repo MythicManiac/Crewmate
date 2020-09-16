@@ -12,6 +12,12 @@ def parse_arguments():
         metavar="<pcap filename>",
         help="path to .pcapng file to dissect"
     )
+    # parser.add_argument(
+    #     "--capture",
+    #     help="capture traffic in real time from an among us instance",
+    #     action="store_true",
+    #     default=False,
+    # )
     parser.add_argument(
         "--capture",
         metavar="<pid>",
