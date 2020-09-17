@@ -6,14 +6,15 @@ from scapy.layers.l2 import Ether
 from scapy.layers.inet import UDP
 
 from crewmate.packets import RPC, RoomMessageType, RPCAction, RoomMessage, Hazel, HazelType
+from settings import DISCORD_UNMUTE_URL, DISCORD_MUTE_URL
 
 
 def unmute_discord():
-    requests.get("unmute url")
+    requests.get(DISCORD_UNMUTE_URL)
 
 
 def mute_discord():
-    requests.get("mute url")
+    requests.get(DISCORD_MUTE_URL)
 
 
 class Dissector:

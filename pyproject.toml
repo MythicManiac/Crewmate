@@ -10,6 +10,7 @@ python = "^3.8"
 scapy = "^2.4.4"
 psutil = "^5.7.2"
 requests = "^2.24.0"
+python-dotenv = "^0.14.0"
 
 [tool.poetry.dev-dependencies]
 
