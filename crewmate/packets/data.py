@@ -1,7 +1,7 @@
-from scapy.fields import MSBExtendedField, ByteField, ShortField, StrLenField, PacketListField
+from scapy.fields import MSBExtendedField, ByteField, StrLenField, PacketListField, LEShortField
 from scapy.packet import Packet
 
-from crewmate.utils import MSBExtendedFieldLenField
+from crewmate.utils import MSBExtendedFieldLenField, SizeAwarePacket
 
 
 class TaskData(Packet):
@@ -15,10 +15,10 @@ class TaskData(Packet):
         return "", p
 
 
-class PlayerData(Packet):
+class PlayerData(SizeAwarePacket, Packet):
     name = "PlayerData"
     fields_desc = [
-        ShortField("updateGameDataLen", None),
+        LEShortField("playerDataLen", None),
         ByteField("playerId", None),
         MSBExtendedFieldLenField("playerNameLen", None, "playerName"),
         StrLenField(
@@ -37,5 +37,5 @@ class PlayerData(Packet):
         ),
     ]
 
-    def extract_padding(self, p):
-        return "", p
+    def get_expected_size(self):
+        return self.playerDataLen + 3

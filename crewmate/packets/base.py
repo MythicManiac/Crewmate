@@ -6,7 +6,7 @@ from scapy.fields import (
     IntField,
     PacketListField,
     LEShortField,
-)
+    ByteField)
 from scapy.packet import Packet
 
 from crewmate.packets.enums import (
@@ -15,11 +15,11 @@ from crewmate.packets.enums import (
     HazelType,
 )
 from crewmate.packets.rpc.rpc import RPC
-from crewmate.utils import AmongUsEnvelope
+from crewmate.utils import SizeAwarePacket, field_switch
 
 
-class GameDataData(Packet):
-    name = "GameDataData"
+class Data(Packet):
+    name = "Data"
     fields_desc = [
     ]
 
@@ -27,23 +27,30 @@ class GameDataData(Packet):
         return "", p
 
 
-class GameData(AmongUsEnvelope, Packet):
+class Despawn(Packet):
+    name = "Despawn"
+    fields_desc = [
+        ByteField("playerId", None),
+    ]
+
+    def extract_padding(self, p):
+        return "", p
+
+
+class GameData(SizeAwarePacket, Packet):
     name = "GameData"
     fields_desc = [
         LEShortField("contentSize", None),
         ByteEnumField("type", None, GameDataType.as_dict()),
-        ConditionalField(
-            PacketField("RPC", None, RPC),
-            lambda packet: packet.type == GameDataType.RPC,
-        ),
-        ConditionalField(
-            PacketField("data", None, GameDataData),
-            lambda packet: packet.type == GameDataType.DATA,
-        ),
+        *field_switch({
+            GameDataType.RPC: PacketField("rpc", None, RPC),
+            GameDataType.DATA: PacketField("data", None, Data),
+            GameDataType.DESPAWN: PacketField("despawn", None, Despawn),
+        }, lambda pkt: pkt.type)
     ]
 
 
-class RoomMessage(AmongUsEnvelope, Packet):
+class RoomMessage(SizeAwarePacket, Packet):
     name = "RoomMessage"
     fields_desc = [
         LEShortField("contentSize", None),

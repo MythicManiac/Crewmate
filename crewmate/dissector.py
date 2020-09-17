@@ -1,13 +1,11 @@
 import requests
 
-from scapy.packet import bind_layers, Padding, Raw
+from scapy.packet import Padding, Raw
 from scapy.utils import RawPcapReader, hexdump
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import UDP
 
-from crewmate.packets import Hazel, RPC, RoomMessageType, RPCAction, RoomMessage
-
-LAYERS_BOUND = False
+from crewmate.packets import RPC, RoomMessageType, RPCAction, RoomMessage, Hazel, HazelType
 
 
 def unmute_discord():
@@ -18,23 +16,15 @@ def mute_discord():
     requests.get("mute url")
 
 
-def register_layers():
-    global LAYERS_BOUND
-    if not LAYERS_BOUND:
-        bind_layers(UDP, Hazel)
-        LAYERS_BOUND = True
-
-
 class Dissector:
-
-    def __init__(self):
-        register_layers()
 
     def dissect_packet(self, packet):
         if UDP not in packet:
             return
         udp = packet[UDP]
-        if RPC not in packet:
+        if Hazel not in packet:
+            return
+        if packet[Hazel].type != HazelType.RELIABLE:
             return
         udp.show()
         if Padding in udp:
@@ -68,7 +58,6 @@ class PcapDissector(Dissector):
 
     def process_pcap(self):
         print(f"Reading {self.filepath}")
-        register_layers()
 
         count = 0
         for (packet, meta,) in RawPcapReader(self.filepath):

@@ -1,4 +1,4 @@
-from scapy.fields import MSBExtendedField
+from scapy.fields import MSBExtendedField, ConditionalField
 
 
 class PacketFieldEnum:
@@ -44,7 +44,10 @@ class MSBExtendedFieldLenField(MSBExtendedField):
 
 
 # noinspection PyAttributeOutsideInit
-class AmongUsEnvelope:
+class SizeAwarePacket:
+
+    def get_expected_size(self):
+        return getattr(self, "contentSize") + 3
 
     def pre_dissect(self, s):
         self.pre_dissect_length = len(s)
@@ -55,7 +58,15 @@ class AmongUsEnvelope:
         return s
 
     def extract_padding(self, s):
-        expected_size = self.contentSize + 3
+        expected_size = self.get_expected_size()
         current_size = self.pre_dissect_length - self.post_dissect_length
         padding = expected_size - current_size
         return s[:padding], s[padding:]
+
+
+def field_switch(mapping, key_extractor):
+    result = []
+    for key, val in mapping.items():
+        field = ConditionalField(val, lambda pkt, key=key: key_extractor(pkt) == key)
+        result.append(field)
+    return result
