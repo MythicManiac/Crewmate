@@ -8,7 +8,7 @@ from scapy.fields import (
     MSBExtendedField,
     ByteField,
     PacketListField,
-    LEShortField)
+    LEShortField, PadField)
 from scapy.packet import Packet
 
 
@@ -110,7 +110,7 @@ class RPCAction(PacketFieldEnum):
     UPDATEGAMEDATA = 30
 
 
-class HazelTag(PacketFieldEnum):
+class AmongUsMessageType(PacketFieldEnum):
     HOST_GAME = 0
     JOIN_GAME = 1
     START_GAME = 2
@@ -314,7 +314,25 @@ class GameDataData(Packet):
         return "", p
 
 
-class GameData(Packet):
+# noinspection PyAttributeOutsideInit
+class AmongUsEnvelope:
+
+    def pre_dissect(self, s):
+        self.pre_dissect_length = len(s)
+        return s
+
+    def post_dissect(self, s):
+        self.post_dissect_length = len(s)
+        return s
+
+    def extract_padding(self, s):
+        expected_size = self.contentSize + 3
+        current_size = self.pre_dissect_length - self.post_dissect_length
+        padding = expected_size - current_size
+        return s[:padding], s[padding:]
+
+
+class GameData(AmongUsEnvelope, Packet):
     name = "GameData"
     fields_desc = [
         LEShortField("contentSize", None),
@@ -329,19 +347,15 @@ class GameData(Packet):
         ),
     ]
 
-    def extract_padding(self, p):
-        return "", p
 
-
-class GameDataEnvelope(Packet):
-    name = "GameDataEnvelope"
+class AmongUsMessage(AmongUsEnvelope, Packet):
+    name = "AmongUsMessage"
     fields_desc = [
+        LEShortField("contentSize", None),
+        ByteEnumField("type", None, AmongUsMessageType.as_dict()),
         IntField("roomCode", None),
-        PacketListField("messages", [], cls=GameData, count_from=lambda x: 1),
+        PacketListField("messages", [], cls=GameData),
     ]
-
-    def extract_padding(self, p):
-        return "", p
 
 
 class Hazel(Packet):
@@ -352,12 +366,7 @@ class Hazel(Packet):
             ShortField("hazelPacketId", None),
             lambda packet: packet.type in HazelType.get_reliable()
         ),
-        LEShortField("hazelContentSize", None),
-        ByteEnumField("hazelTag", None, HazelTag.as_dict()),
-        ConditionalField(
-            PacketField("GameDataEnvelope", None, GameDataEnvelope),
-            lambda packet: packet.hazelTag == HazelTag.GAME_DATA
-        ),
+        PacketField("AmongUsMessage", None, AmongUsMessage),
     ]
 
     def extract_padding(self, p):

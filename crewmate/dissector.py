@@ -1,11 +1,11 @@
 import requests
 
-from scapy.packet import bind_layers, Padding
+from scapy.packet import bind_layers, Padding, Raw
 from scapy.utils import RawPcapReader, hexdump
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import UDP
 
-from crewmate.packets import Hazel, GameDataEnvelope, RPC, ChatRPC, HazelTag, RPCAction
+from crewmate.packets import Hazel, RPC, ChatRPC, AmongUsMessageType, RPCAction, AmongUsMessage
 
 LAYERS_BOUND = False
 
@@ -22,9 +22,6 @@ def register_layers():
     global LAYERS_BOUND
     if not LAYERS_BOUND:
         bind_layers(UDP, Hazel)
-        bind_layers(Hazel, GameDataEnvelope)
-        bind_layers(GameDataEnvelope, RPC)
-        bind_layers(RPC, ChatRPC)
         LAYERS_BOUND = True
 
 
@@ -42,17 +39,18 @@ class Dissector:
         udp.show()
         if Padding in udp:
             hexdump(udp[Padding])
+        if Raw in udp:
+            hexdump(udp[Raw])
 
 
 class DiscordMuteDissector(Dissector):
 
     def dissect_packet(self, packet):
-        # result = super().dissect_packet(packet)
-        if Hazel in packet:
-            hazel = packet[Hazel]
-            if hazel.hazelTag == HazelTag.START_GAME:
+        if AmongUsMessage in packet:
+            message = packet[AmongUsMessage]
+            if message.hazelTag == AmongUsMessageType.START_GAME:
                 mute_discord()
-            if hazel.hazelTag == HazelTag.END_GAME:
+            if message.hazelTag == AmongUsMessageType.END_GAME:
                 unmute_discord()
         if RPC in packet:
             rpc = packet[RPC]
@@ -60,7 +58,6 @@ class DiscordMuteDissector(Dissector):
                 unmute_discord()
             if rpc.rpcAction == RPCAction.CLOSE:
                 mute_discord()
-        # return result
 
 
 class PcapDissector(Dissector):
