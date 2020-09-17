@@ -8,9 +8,18 @@ class Capturer:
 
     def __init__(self, pid):
         self.pid = pid
-        print(f"Capturing PID: {pid}")
+
+    def get_pid(self):
+        if self.pid:
+            return self.pid
+        for p in psutil.process_iter(attrs=["name", "pid"]):
+            if p.name() == "Among Us.exe":
+                return p.pid
+        raise RuntimeError("Among Us.exe is not running")
 
     def capture(self):
+        pid = self.get_pid()
+        print(f"Capturing PID: {pid}")
         process = psutil.Process(self.pid)
         connections = process.connections("udp")
         if not connections:

@@ -12,16 +12,18 @@ def parse_arguments():
         metavar="<pcap filename>",
         help="path to .pcapng file to dissect"
     )
-    # parser.add_argument(
-    #     "--capture",
-    #     help="capture traffic in real time from an among us instance",
-    #     action="store_true",
-    #     default=False,
-    # )
     parser.add_argument(
         "--capture",
+        help="capture traffic in real time from an among us instance",
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--pid",
         metavar="<pid>",
-        help="pid of an among us instance"
+        help="pid of an among us instance",
+        required=False,
+        default=None,
     )
     return vars(parser.parse_args())
 
@@ -32,12 +34,12 @@ def validate_arguments(args):
     if dissect:
         if not os.path.exists(dissect):
             errors.append(f"File not found: {dissect}")
-    capture = args.get("capture", False)
-    if capture:
+    pid = args.get("pid", False)
+    if pid:
         try:
-            args["capture"] = int(capture)
+            args["pid"] = int(pid)
         except ValueError:
-            errors.append(f"Invalid capture PID: {capture}")
+            errors.append(f"Invalid capture PID: {pid}")
     return errors
 
 
@@ -46,7 +48,7 @@ def execute(args):
         dissector = PcapDissector(args["dissect"])
         dissector.process_pcap()
     if args.get("capture"):
-        capturer = Capturer(args["capture"])
+        capturer = Capturer(args.get("pid", None))
         capturer.capture()
 
 
