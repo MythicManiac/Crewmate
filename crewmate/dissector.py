@@ -5,7 +5,7 @@ from scapy.utils import RawPcapReader, hexdump
 from scapy.layers.l2 import Ether
 from scapy.layers.inet import UDP
 
-from crewmate.packets import Hazel, RPC, ChatRPC, AmongUsMessageType, RPCAction, AmongUsMessage
+from crewmate.packets import Hazel, RPC, RoomMessageType, RPCAction, RoomMessage
 
 LAYERS_BOUND = False
 
@@ -46,11 +46,11 @@ class Dissector:
 class DiscordMuteDissector(Dissector):
 
     def dissect_packet(self, packet):
-        if AmongUsMessage in packet:
-            message = packet[AmongUsMessage]
-            if message.hazelTag == AmongUsMessageType.START_GAME:
+        if RoomMessage in packet:
+            message = packet[RoomMessage]
+            if message.hazelTag == RoomMessageType.START_GAME:
                 mute_discord()
-            if message.hazelTag == AmongUsMessageType.END_GAME:
+            if message.hazelTag == RoomMessageType.END_GAME:
                 unmute_discord()
         if RPC in packet:
             rpc = packet[RPC]
