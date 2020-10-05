@@ -3,6 +3,8 @@ from scapy.packet import Packet
 
 from crewmate.packets.enums import RPCAction
 from crewmate.packets.rpc.complete_task import CompleteTaskRPC
+from crewmate.packets.rpc.enter_vent import EnterVentRPC
+from crewmate.packets.rpc.exit_vent import ExitVentRPC
 from crewmate.packets.rpc.report_dead_body import ReportDeadBodyRPC
 from crewmate.packets.rpc.send_chat import SendChatRPC
 from crewmate.packets.rpc.send_chat_note import SendChatNoteRPC
@@ -37,6 +39,8 @@ class RPC(Packet):
             RPCAction.REPORTDEADBODY: PacketField("reportDeadBody", None, ReportDeadBodyRPC),
             RPCAction.UPDATEGAMEDATA: PacketField("updateGameData", None, UpdateGameDataRPC),
             RPCAction.COMPLETETASK: PacketField("completeTask", None, CompleteTaskRPC),
+            RPCAction.ENTERVENT: PacketField("enterVent", None, EnterVentRPC),
+            RPCAction.EXITVENT: PacketField("exitVent", None, ExitVentRPC),
         }, lambda pkt: pkt.rpcAction),
     ]
 

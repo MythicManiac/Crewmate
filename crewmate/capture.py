@@ -1,7 +1,7 @@
 import psutil
 from scapy.sendrecv import sniff
 
-from crewmate.dissector import DiscordMuteDissector
+from crewmate.dissector import DiscordMuteDissector, GameTrackingDissector, DebugPrintDissector
 
 
 class Capturer:
@@ -20,14 +20,14 @@ class Capturer:
     def capture(self):
         pid = self.get_pid()
         print(f"Capturing PID: {pid}")
-        process = psutil.Process(self.pid)
+        process = psutil.Process(pid)
         connections = process.connections("udp")
         if not connections:
             print("Found no active connections")
             return
         print(f"Found {len(connections)} connections, picking first")
         connection = connections[0]
-        dissector = DiscordMuteDissector()
+        dissector = DebugPrintDissector()
         print(f"Using connection port {connection.laddr.port}")
 
         def callback(packet):
